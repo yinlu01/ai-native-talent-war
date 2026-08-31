@@ -1,9 +1,10 @@
 /* ============================================================
- * 《AI 原生人才争夺战》 地图生成 v2（简化路线版）
+ * 《AI 原生人才争夺战》 地图生成 v3（杀戮尖塔式3列单路径布局）
  * 设计目标：
- *  - 每幕 12 层、每层 2-4 节点（原 15 层 × 4-6 节点太密）
- *  - 连边遵循"就近单调"，视觉上几乎无交叉线
- *  - 节点类型分布保证：每幕 ≥1 商店、≥1 休息（BOSS 前保底）、2 精英
+ *  - 3列布局，每行3个节点选择（类Slay the Spire）
+ *  - 单路径从底部向顶部推进（类似从左下到右上的斜向路线）
+ *  - 每幕7-9层，紧凑排列可在一个屏幕内展示
+ *  - 节点类型分布保证：每幕有精英、商店、休息、BOSS
  * ============================================================ */
 (function (root, factory) {
   const M = factory();
@@ -15,100 +16,173 @@
   const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
+  /* 每幕总层数（不含入口和BOSS） */
+  const ACT_ROWS = { 1: 7, 2: 7, 3: 7, 4: 4 };
+
+  /* 节点类型权重（相对概率） */
+  const POOL_FIGHT = 'fight', POOL_ELITE = 'elite', POOL_SHOP = 'shop',
+        POOL_REST = 'rest', POOL_EVENT = 'event', POOL_BOSS = 'boss';
+
+  /**
+   * 生成一幕地图
+   * @param {number} actIdx 幕索引（1-4）
+   * @returns {object} { rows: [[{type, col, edges, visited}]], path: [col indices] }
+   *
+   * 布局设计（杀戮尖塔风格）：
+   * - 每行3个节点，分别在左(0)、中(1)、右(2)列
+   * - 玩家只能选择与上一列相邻的列（0→0或1, 1→0或1或2, 2→1或2）
+   * - 这样形成一条从左下蜿蜒到右上的路径
+   */
   function generateAct(actIdx, totalRows) {
-    totalRows = totalRows || (actIdx === 4 ? 4 : 12);
-    const isFinal = actIdx === 3;
+    totalRows = totalRows || ACT_ROWS[actIdx] || 7;
+    const isFinal = actIdx === 4;
 
-    /* ---- 每层节点数：首层 2，中间 2-3，BOSS 层 1 ---- */
-    const widths = [];
-    for (let r = 0; r < totalRows; r++) {
-      if (r === totalRows - 1) widths.push(1);
-      else if (r === 0) widths.push(2);
-      else widths.push(ri(2, 3));
+    /* ---- 构建行的基础结构 ---- */
+    // rows[0] 是入口（1个节点在中间）
+    // rows[1..totalRows-2] 是中间层（每行3个节点）
+    // rows[totalRows-1] 是BOSS层（1个节点在中间）
+    const numRows = totalRows + 1; // +1 for entrance row
+
+    const types = [];
+    const pathCols = []; // 每层的列选择
+
+    // 第0行：入口（只有中间列有节点）
+    types.push([null, 'entrance', null]);
+
+    // 中间层：随机分配节点类型
+    for (let r = 1; r < numRows - 1; r++) {
+      types.push(['fight', 'fight', 'fight']);
     }
 
-    /* ---- 节点类型分配 ---- */
-    const types = widths.map(w => new Array(w).fill('fight'));
-    types[totalRows - 1][0] = 'boss';
+    // 最后一行：BOSS
+    types.push([null, 'boss', null]);
 
+    /* ---- 分配特殊节点 ---- */
     if (isFinal) {
-      /* 终章短幕：入口 → 战斗/事件 → 战斗 → 休息 → BOSS */
-      if (totalRows >= 4) {
-        types[1][ri(0, widths[1] - 1)] = 'event';
-        types[totalRows - 2][ri(0, widths[totalRows - 2] - 1)] = 'rest';
-      }
+      // 终章：短而精
+      // 第1行随机一个事件
+      const evRow = ri(1, Math.min(2, numRows - 3));
+      types[evRow] = [null, 'event', null];
+      // 休息点
+      const restRow = ri(1, numRows - 3);
+      if (types[restRow][1] === 'fight') types[restRow] = [null, 'rest', null];
     } else {
-      /* 精英：2 个（前段 1 + 中段 1） */
-      const elite1 = ri(3, 5);
-      const elite2 = ri(6, Math.min(9, totalRows - 4));
-      types[elite1][ri(0, widths[elite1] - 1)] = 'elite';
-      if (elite2 !== elite1) types[elite2][ri(0, widths[elite2] - 1)] = 'elite';
+      // 普通幕：2个精英（前段1个 + 中后段1个）
+      const elite1 = ri(2, 3);
+      const elite2 = ri(4, numRows - 3);
+      types[elite1] = [null, 'elite', null];
+      if (elite2 !== elite1) types[elite2] = [null, 'elite', null];
 
-      /* 商店：1 个（中段） */
-      const shopRow = ri(5, totalRows - 5);
-      types[shopRow][ri(0, widths[shopRow] - 1)] = 'shop';
+      // 1个商店（中段）
+      const shopRow = ri(3, numRows - 4);
+      if (types[shopRow][1] === 'fight') types[shopRow] = [null, 'shop', null];
 
-      /* BOSS 前一层保底一个非战斗节点（休息优先） */
-      const preBoss = totalRows - 2;
-      if (types[preBoss].every(t => t === 'fight')) {
-        types[preBoss][ri(0, widths[preBoss] - 1)] = Math.random() < 0.65 ? 'rest' : 'shop';
-      }
+      // 1个休息点（中后段）
+      const restRow = ri(3, numRows - 3);
+      if (types[restRow][1] === 'fight') types[restRow] = [null, 'rest', null];
 
-      /* 休息：中后段 1 个（若该层全为战斗） */
-      const restRow = ri(Math.floor(totalRows * 0.45), totalRows - 4);
-      if (types[restRow].every(t => t === 'fight')) types[restRow][ri(0, widths[restRow] - 1)] = 'rest';
-
-      /* 事件：约 1/4 的普通战斗换成事件（不覆盖特殊节点） */
-      for (let r = 1; r < totalRows - 1; r++) {
-        for (let c = 0; c < widths[r]; c++) {
-          if (types[r][c] === 'fight' && Math.random() < 0.22) types[r][c] = 'event';
+      // 约20%的战斗换成事件
+      for (let r = 1; r < numRows - 1; r++) {
+        if (types[r][1] === 'fight' && Math.random() < 0.2) {
+          types[r] = [null, 'event', null];
         }
       }
     }
 
-    /* ---- 连边：就近单调，最少交叉 ---- */
-    const map = [];
-    for (let r = 0; r < totalRows; r++) {
-      map.push(types[r].map(t => ({ type: t, edges: [], visited: false })));
-    }
-    for (let r = 0; r < totalRows - 1; r++) {
-      const w0 = widths[r], w1 = widths[r + 1];
-      const indeg = new Array(w1).fill(0);
-      for (let i = 0; i < w0; i++) {
-        /* 比例映射的目标列（保证视觉单调不交叉） */
-        const base = Math.min(w1 - 1, Math.floor(i * w1 / w0));
-        const targets = [base];
-        /* 30% 概率分叉到相邻列（制造路线选择） */
-        if (w1 > 1 && Math.random() < 0.3) {
-          const alt = base + (base < w1 - 1 ? 1 : -1);
-          if (alt >= 0 && alt < w1) targets.push(alt);
+    /* ---- 生成连边（单路径约束） ---- */
+    // 从入口(第0行中间)开始，每一层的列选择受到上一层的约束
+    // 约束：相邻列之间才能连接（0→0或1, 1→0或1或2, 2→1或2）
+    const rows = [];
+    let prevCol = 1; // 入口在中间列
+
+    for (let r = 0; r < numRows; r++) {
+      const rowTypes = types[r];
+      const rowNodes = [];
+
+      for (let c = 0; c < 3; c++) {
+        const nodeType = rowTypes[c];
+        if (nodeType === null) {
+          rowNodes.push(null); // 无节点位置
+        } else {
+          const node = {
+            type: nodeType,
+            col: c,
+            edges: [], // 可选的下一列
+            visited: false
+          };
+
+          // 计算可选的下一列（基于当前位置的相邻列）
+          // 下一层中，与当前列相邻的列才可选
+          const nextCols = [];
+          if (c === 0) nextCols.push(0, 1);
+          else if (c === 2) nextCols.push(1, 2);
+          else nextCols.push(0, 1, 2);
+
+          // 如果下一行该列有节点，则连接
+          if (r < numRows - 1 && types[r + 1][c] !== null) {
+            node.edges.push(c);
+          }
+          // 相邻列的连接
+          for (const nc of nextCols) {
+            if (nc !== c && r < numRows - 1 && types[r + 1][nc] !== null) {
+              if (!node.edges.includes(nc)) node.edges.push(nc);
+            }
+          }
+
+          rowNodes.push(node);
         }
-        for (const t of targets) {
-          if (!map[r][i].edges.includes(t)) {
-            map[r][i].edges.push(t);
-            indeg[t]++;
+      }
+
+      rows.push(rowNodes);
+
+      // 决定下一层选择哪一列（基于当前节点的可连接列）
+      if (r < numRows - 1) {
+        const currentNode = rowNodes[prevCol];
+        if (currentNode && currentNode.edges.length > 0) {
+          prevCol = pick(currentNode.edges);
+        } else {
+          // 找不到有效连接，随机选一个有节点的列
+          const availableCols = currentNode ? currentNode.edges : [];
+          if (availableCols.length === 0) {
+            // 回退：从下一行有节点的列中随机选
+            for (let c = 0; c < 3; c++) {
+              if (types[r + 1][c] !== null) { prevCol = c; break; }
+            }
           }
         }
+        pathCols.push(prevCol);
       }
-      /* 补孤岛：无入边的节点从最近的上游连一条 */
-      for (let j = 0; j < w1; j++) {
-        if (indeg[j] === 0) {
-          const from = Math.min(w0 - 1, Math.max(0, Math.round(j * w0 / w1)));
-          if (!map[r][from].edges.includes(j)) map[r][from].edges.push(j);
-        }
-      }
-      /* 边按目标列排序（渲染顺序稳定） */
-      for (let i = 0; i < w0; i++) map[r][i].edges.sort((a, b) => a - b);
     }
-    return { rows: map, act: actIdx };
+
+    return { rows, path: pathCols, act: actIdx };
   }
 
-  /** 当前位置的可选下一步 */
+  /**
+   * 获取指定位置的可用下一步
+   */
   function nextOptions(map, pos) {
-    if (!pos) return map.rows[0].map((_, i) => ({ row: 0, col: i }));
+    if (!pos) {
+      // 起点：返回第一行所有节点
+      return map.rows[0].map((n, i) => n ? { row: 0, col: i } : null).filter(Boolean);
+    }
     const node = map.rows[pos.row][pos.col];
-    return node.edges.map(c => ({ row: pos.row + 1, col: c }));
+    if (!node) return [];
+    return node.edges.map(c => ({ row: pos.row + 1, col: c })).filter(
+      opt => map.rows[opt.row] && map.rows[opt.row][opt.col]
+    );
   }
 
-  return { generateAct, nextOptions };
+  /**
+   * 检查某行某列是否可达（基于历史路径）
+   */
+  function canReach(map, row, col, historyPath) {
+    if (row === 0) return map.rows[0][col] !== null;
+    if (row > historyPath.length) return false;
+
+    const prevCol = historyPath[row - 1];
+    // 相邻列检查
+    return Math.abs(prevCol - col) <= 1 && map.rows[row][col] !== null;
+  }
+
+  return { generateAct, nextOptions, canReach, ACT_ROWS };
 });

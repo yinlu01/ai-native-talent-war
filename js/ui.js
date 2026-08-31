@@ -294,14 +294,22 @@
 
   /* ---------------- 幕 / 地图 ---------------- */
   const NODE_META = {
+    entrance: { icon: '🚪', label: '入口', color: '#38bdf8' },
     fight: { icon: '⚔️', label: '部门挑战', color: '#ef6a5a' },
     elite: { icon: '👑', label: '关键战役', color: '#d4a94e' },
     shop: { icon: '🛒', label: '猎头市场', color: '#4ade80' },
     rest: { icon: '☕', label: '复盘会', color: '#f5b453' },
     event: { icon: '❓', label: '管理事件', color: '#a78bfa' },
-    boss: { icon: ' skull', label: '组织高峰会', color: '#ef6a5a' }
+    boss: { icon: '☠️', label: 'BOSS战', color: '#ef6a5a' }
   };
-  NODE_META.boss.icon = '☠️';
+
+  /* 每幕主题色（用于地图背景/节点辉光） */
+  const ACT_THEME = {
+    1: { bg: '#0a0f1a', accent: '#38bdf8', glow: 'rgba(56,189,248,0.15)', name: '从0到1' },
+    2: { bg: '#0d1510', accent: '#4ade80', glow: 'rgba(74,222,128,0.12)', name: '规模化' },
+    3: { bg: '#100d1a', accent: '#a78bfa', glow: 'rgba(167,139,250,0.12)', name: '人机协同' },
+    4: { bg: '#1a0d0d', accent: '#ef6a5a', glow: 'rgba(239,106,90,0.15)', name: '终极重构' }
+  };
 
   const ACT_NAME = { 1: '第一幕 · 从 0 到 1', 2: '第二幕 · 规模化', 3: '第三幕 · 人机协同治理', 4: '终章 · 终极重构' };
   const ACT_BG = { 1: 'bg_act1', 2: 'bg_act2', 3: 'bg_act3', 4: 'bg_final' };
@@ -309,9 +317,7 @@
   function newAct(act) {
     G.act = act;
     G.pos = null;
-    // 使用 12 行（非终章）+ 4 行（终章），配合 880px 高 SVG，rowGap ≈ 60px，节点不拥挤
-    const rows = act === 4 ? 4 : 12;
-    G.maps[act] = MG.generateAct(act, rows);
+    G.maps[act] = MG.generateAct(act);
     renderMap();
     showScreen('map');
     if (act > 1) toast(ACT_NAME[act] + ' 开始');
@@ -320,10 +326,17 @@
   function renderMap() {
     const map = G.maps[G.act];
     const m = map.rows;
+    const theme = ACT_THEME[G.act];
     $('#map-title').textContent = ACT_NAME[G.act];
-    $('#map-sub').textContent = `第 ${G.act} 幕 / ${G.actMax === 4 ? 4 : 4} 幕 · 选择你的路线`;
+    $('#map-sub').textContent = `第 ${G.act} 幕 · 选择你的路线`;
     $('#hud-hp').textContent = `${G.hp} / ${G.maxHp}`;
     $('#hud-budget').textContent = G.budget;
+
+    // 更新地图背景主题色
+    const mapScreen = $('#screen-map');
+    mapScreen.style.background = `linear-gradient(180deg, ${theme.bg} 0%, #080c14 100%)`;
+    mapScreen.querySelector('::before') && mapScreen.style.setProperty('--map-accent', theme.accent);
+
     const relicBar = $('#relic-bar');
     relicBar.innerHTML = '';
     for (const rid of G.relics) {
@@ -336,73 +349,120 @@
     }
 
     const svgWrap = $('#map-svg');
-    // 使用更高、更宽松的画布 (Slay the Spire 风格)
     const W = svgWrap.clientWidth || 1200;
-    const H = svgWrap.clientHeight || 880;
+    const H = svgWrap.clientHeight || 700;
+
     const rows = m.length;
-    const padX = 110, padTop = 70, padBot = 90;
+    const numCols = 3;
+    const padX = W * 0.18;
+    const padTop = 60;
+    const padBot = 80;
     const rowGap = (H - padTop - padBot) / (rows - 1);
+    const colWidth = (W - padX * 2) / (numCols - 1);
+
+    // 列位置：左、中、右
+    const colX = [padX, W / 2, W - padX];
+
+    // 计算每行每列节点的位置
     const posOf = (r, c) => ({
-      x: padX + (W - padX * 2) * (m[r].length === 1 ? 0.5 : c / (m[r].length - 1)),
+      x: colX[c],
       y: H - padBot - r * rowGap
     });
 
-    /* 可选节点集合 */
+    // 计算可用节点集合
     let avail = new Set();
-    if (!G.pos) m[0].forEach((_, i) => avail.add('0,' + i));
-    else m[G.pos.row][G.pos.col].edges.forEach(c => avail.add((G.pos.row + 1) + ',' + c));
+    if (!G.pos) {
+      // 起点：入口行的中间节点
+      m[0].forEach((node, c) => { if (node) avail.add('0,' + c); });
+    } else {
+      // 根据当前位置找下一层可选节点
+      const currentNode = m[G.pos.row][G.pos.col];
+      if (currentNode) {
+        currentNode.edges.forEach(c => {
+          if (m[G.pos.row + 1] && m[G.pos.row + 1][c]) {
+            avail.add((G.pos.row + 1) + ',' + c);
+          }
+        });
+      }
+    }
 
-    /* 构建曲线边缘 SVG（双层：glow + 亮线） */
-    let edgeGlow = '', edgeLine = '';
+    // 构建SVG边缘
+    let edges = '';
     for (let r = 0; r < rows - 1; r++) {
       m[r].forEach((node, c) => {
+        if (!node) return;
         node.edges.forEach(t => {
+          if (!m[r + 1][t]) return;
           const a = posOf(r, c), b = posOf(r + 1, t);
-          const lit = G.pos && G.pos.row === r && G.pos.col === c;
-          // 贝塞尔曲线控制点：水平中分 + 垂直中点
-          const cpX = (a.x + b.x) / 2;
-          const cpY = (a.y + b.y) / 2;
-          const d = `M ${a.x} ${a.y} Q ${cpX} ${a.y} ${b.x} ${b.y}`;
-          const glowD = `M ${a.x} ${a.y} Q ${cpX} ${a.y} ${b.x} ${b.y}`;
-          edgeGlow += `<path class="map-edge-glow${lit ? ' lit' : ''}" d="${glowD}"/>`;
-          edgeLine += `<path class="map-edge${lit ? ' lit' : ''}" d="${d}"/>`;
+          const isLit = G.pos && G.pos.row === r && G.pos.col === c;
+          const isPast = G.pos && r < G.pos.row;
+          const alpha = isPast ? 0.08 : isLit ? 0.7 : 0.25;
+          const color = isPast ? '#4a5568' : theme.accent;
+          edges += `<path d="M${a.x},${a.y} L${b.x},${b.y}"
+            stroke="${color}" stroke-width="${isLit ? 3 : 2}" stroke-opacity="${alpha}"
+            fill="none" ${isLit ? 'stroke-dasharray="6,3"' : ''}/>`;
         });
       });
     }
 
+    // 构建节点
     let nodes = '';
     for (let r = 0; r < rows; r++) {
       m[r].forEach((node, c) => {
+        if (!node) return;
         const p = posOf(r, c);
         const meta = NODE_META[node.type];
         const key = r + ',' + c;
         const isAvail = avail.has(key);
         const isCur = G.pos && G.pos.row === r && G.pos.col === c;
-        const isPast = !isAvail && !isCur && r <= (G.pos ? G.pos.row : -1);
-        const R = node.type === 'boss' ? 30 : 22;
-        const nodeClass = [
-          'map-node',
-          isAvail ? 'avail' : '',
-          isCur ? 'current' : '',
-          isPast ? 'past' : '',
-          node.type === 'boss' ? 'boss-node' : ''
-        ].filter(Boolean).join(' ');
-        // 辉光圈半径
-        const haloR = R + 7;
-        nodes += `<g class="${nodeClass}" data-key="${key}" transform="translate(${p.x},${p.y})">
-          <circle class="node-halo" r="${haloR}" fill="none" stroke="${meta.color}" stroke-width="2"/>
-          <circle class="node-bg" r="${R}" fill="${isAvail || isCur ? meta.color : '#16223c'}" fill-opacity="${isAvail ? 0.9 : 0.82}" stroke="${meta.color}" stroke-width="${node.type === 'boss' ? 2.5 : 1.5}"/>
-          <text>${meta.icon}</text>
-          <text class="map-node-label" y="${R + 14}">${meta.label}</text>
+        const isPast = !isAvail && !isCur && G.pos && r < G.pos.row;
+        const isBoss = node.type === 'boss';
+        const R = isBoss ? 32 : 26;
+
+        const stateClass = isCur ? 'current' : isPast ? 'past' : isAvail ? 'avail' : 'locked';
+        const fillColor = isCur ? meta.color : isPast ? '#2a3a52' : isAvail ? meta.color : '#16213c';
+        const fillOpacity = isCur ? 1 : isPast ? 0.6 : isAvail ? 0.92 : 0.75;
+        const strokeW = isCur ? 3 : isBoss ? 2.5 : 1.5;
+
+        nodes += `<g class="map-node ${stateClass}${isBoss ? ' boss-node' : ''}" data-key="${key}" data-type="${node.type}" transform="translate(${p.x},${p.y})">
+          ${isAvail && !isCur ? `<circle r="${R + 10}" fill="none" stroke="${meta.color}" stroke-width="2" opacity="0.5">
+            <animate attributeName="r" values="${R+6};${R+12};${R+6}" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite"/>
+          </circle>` : ''}
+          <circle class="node-bg" r="${R}" fill="${fillColor}" fill-opacity="${fillOpacity}"
+            stroke="${isCur ? meta.color : '#2a3a52'}" stroke-width="${strokeW}"
+            ${isCur ? `filter="drop-shadow(0 0 12px ${meta.color})"` : ''}/>
+          <text text-anchor="middle" dominant-baseline="central" font-size="${isBoss ? 28 : 22}">${meta.icon}</text>
+          <text class="map-node-label" y="${R + 16}" text-anchor="middle" font-size="11" fill="${isPast ? '#4a5568' : '#8fa3c4'}">${meta.label}</text>
+          ${isCur ? `<text y="${-R - 8}" text-anchor="middle" font-size="10" fill="${meta.color}">当前位置</text>` : ''}
         </g>`;
       });
     }
 
-    svgWrap.innerHTML = `<svg id="map-svg-inner" viewBox="0 0 ${W} ${H}" style="width:100%;height:100%">${edgeGlow}${edgeLine}${nodes}</svg>`;
-    $$('.map-node').forEach(el => {
+    // 添加BOSS血条指示（当前进度）
+    let progressBar = '';
+    if (G.pos) {
+      const progress = G.pos.row / (rows - 1) * 100;
+      progressBar = `<rect x="${padX}" y="${H - 30}" width="${W - padX * 2}" height="4" rx="2" fill="#1a2535"/>
+        <rect x="${padX}" y="${H - 30}" width="${(W - padX * 2) * progress / 100}" height="4" rx="2" fill="${theme.accent}"/>`;
+    }
+
+    svgWrap.innerHTML = `<svg id="map-svg-inner" viewBox="0 0 ${W} ${H}" style="width:100%;height:100%">
+      <defs>
+        <filter id="glow"><feGaussianBlur stdDeviation="3" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      ${edges}
+      ${nodes}
+      ${progressBar}
+    </svg>`;
+
+    // 绑定点击事件
+    $$('.map-node.avail, .map-node.current').forEach(el => {
+      el.style.cursor = 'pointer';
       el.addEventListener('click', () => {
-        const [r, c] = el.dataset.key.split(',').map(Number);
-        if (!avail.has(el.dataset.key)) return;
+        const key = el.dataset.key;
+        if (!avail.has(key) && !el.classList.contains('current')) return;
+        const [r, c] = key.split(',').map(Number);
         SFX.play('click');
         enterNode(r, c);
       });
@@ -412,6 +472,7 @@
   function enterNode(r, c) {
     withLock(() => {
       const node = G.maps[G.act].rows[r][c];
+      if (!node) return;
       G.pos = { row: r, col: c };
       node.visited = true;
       switch (node.type) {
@@ -421,6 +482,7 @@
         case 'shop': openShop(); break;
         case 'rest': openRest(); break;
         case 'event': openEvent(); break;
+        case 'entrance': renderMap(); break; // 入口节点直接刷新
       }
     });
   }

@@ -99,23 +99,29 @@ body {
 .dialogue-next { text-align: right; margin-top: 12px; }
 
 /* ---------- 地图 ---------- */
-#screen-map { flex-direction: column; background: linear-gradient(180deg, #0a1120 0%, #0d1830 45%, #0a1120 100%); position: relative; }
-#screen-map::before {
-  content: ''; position: absolute; inset: 0; z-index: 0;
-  background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(56, 189, 248, .07), transparent 60%),
-              radial-gradient(ellipse 50% 40% at 80% 100%, rgba(212, 169, 78, .06), transparent 60%),
-              radial-gradient(ellipse 50% 40% at 15% 80%, rgba(167, 139, 250, .05), transparent 60%);
-  pointer-events: none;
+#screen-map {
+  flex-direction: column;
+  background: linear-gradient(180deg, #0a0f1a 0%, #080c14 50%, #0a0f1a 100%);
+  position: relative;
+  overflow: hidden;
 }
-/* 地图背景网格纹理 */
-#screen-map::after {
-  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background-image: radial-gradient(circle, rgba(56, 189, 248, .04) 1px, transparent 1px);
-  background-size: 32px 32px;
-  opacity: .6;
+/* 地图顶部氛围光效 */
+#screen-map::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 200px;
+  background: radial-gradient(ellipse 80% 100% at 50% 0%, var(--map-accent, rgba(56,189,248,0.08)), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
 }
 #screen-map > * { position: relative; z-index: 1; }
-.map-top { display: flex; justify-content: space-between; align-items: center; padding: 14px 26px; border-bottom: 1px solid var(--line); background: var(--panel); z-index: 5; }
+
+.map-top {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 26px; border-bottom: 1px solid var(--line); background: var(--panel); z-index: 5;
+  flex-shrink: 0;
+}
 .map-title { font-size: 18px; letter-spacing: 3px; }
 .map-title small { color: var(--txt2); font-size: 12px; display: block; margin-top: 4px; letter-spacing: 1px; }
 .map-hud { display: flex; gap: 14px; align-items: center; }
@@ -137,78 +143,26 @@ body {
 }
 .relic-dot:hover .relic-tip { display: block; }
 .relic-tip b { color: var(--amber); display: block; margin-bottom: 4px; }
-#map-svg-wrap { flex: 1; overflow: hidden; position: relative; }
+#map-svg-wrap { flex: 1; position: relative; min-height: 0; }
 #map-svg { width: 100%; height: 100%; }
 
 /* 地图节点样式 */
-.map-node { cursor: pointer; }
-.map-node circle.node-bg { transition: all .25s ease; }
-.map-node circle.node-halo { transition: all .25s ease; opacity: 0; }
-
-/* 可用节点光晕呼吸动画 */
-.map-node.avail circle.node-halo {
-  opacity: 1;
-  animation: nodeGlow 2.4s ease-in-out infinite;
-}
-@keyframes nodeGlow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.85; }
-}
-
-/* 当前节点脉冲动画 */
-.map-node.current circle.node-halo {
-  opacity: 1;
-  animation: nodePulse 1.6s ease-in-out infinite;
-}
-@keyframes nodePulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.08); }
-}
-
-.map-node.avail:hover circle.node-bg {
-  filter: drop-shadow(0 0 14px var(--cyan)) brightness(1.2);
-  transform: scale(1.12);
-}
-.map-node.avail:hover circle.node-halo { opacity: 0; }
-
-.map-node.past { opacity: .5; }
-.map-node.past circle.node-bg { filter: none; }
-
-.map-node.current circle.node-bg {
-  stroke: var(--amber);
-  stroke-width: 2.5;
-  filter: drop-shadow(0 0 12px var(--amber));
-}
-
-.map-node text { fill: var(--txt); font-size: 16px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
-.map-edge { stroke: rgba(120, 160, 220, .12); stroke-width: 2; fill: none; }
-.map-edge.lit { stroke: rgba(56, 189, 248, .6); stroke-width: 2.5; }
-/* 曲线边缘辉光底层 */
-.map-edge-glow { stroke: rgba(56, 189, 248, .18); stroke-width: 6; fill: none; filter: blur(3px); }
-.map-edge-glow.lit { stroke: rgba(56, 189, 248, .35); stroke-width: 8; }
-.map-node-label { fill: var(--txt2); font-size: 10px; text-anchor: middle; pointer-events: none; letter-spacing: .5px; }
+.map-node { cursor: pointer; transition: transform .2s; }
+.map-node:hover { transform: scale(1.08); }
+.map-node.locked { opacity: 0.4; cursor: not-allowed; }
+.map-node.past { opacity: 0.5; }
+.map-node.past:hover { transform: none; }
+.map-node.current { cursor: default; }
+.map-node.current:hover { transform: none; }
 
 /* BOSS 节点特殊样式 */
 .map-node.boss-node circle.node-bg {
   stroke-width: 3;
-  filter: drop-shadow(0 0 10px rgba(239, 106, 90, .6));
-}
-.map-node.boss-node circle.node-halo { animation: bossPulse 1.2s ease-in-out infinite; }
-@keyframes bossPulse {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.15); }
+  filter: drop-shadow(0 0 15px rgba(239, 106, 90, .6));
 }
 
-/* 节点悬停标签提示 */
-.map-node-tooltip {
-  position: absolute; top: -32px; left: 50%; transform: translateX(-50%);
-  background: rgba(10, 16, 30, .95); border: 1px solid var(--cyan);
-  border-radius: 6px; padding: 4px 10px; font-size: 11px; color: var(--cyan);
-  white-space: nowrap; pointer-events: none; opacity: 0;
-  transition: opacity .2s;
-  letter-spacing: 1px;
-}
-.map-node.avail:hover .map-node-tooltip { opacity: 1; }
+.map-node-label { fill: var(--txt2); font-size: 11px; pointer-events: none; letter-spacing: .5px; font-family: inherit; }
+.map-node text { fill: var(--txt); pointer-events: none; }
 
 /* ---------- 战斗 ---------- */
 #screen-battle { flex-direction: column; background: #05080f; }
