@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 原生人才争夺战 · AI-Native Talent War</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 主菜单 -->
+  <div class="screen on" id="screen-menu">
+    <div class="bg" style="background-image:url(assets/bg_menu.png)"></div>
+    <div class="veil"></div>
+    <div class="menu-box">
+      <div class="game-title">AI 原生人才争夺战<span class="sub">AI-NATIVE TALENT WAR</span></div>
+      <div class="menu-slogan">人才即卡组 · 组织即战场<br>用判断力、提问力、鉴赏力与编排力，重构一家熵增三十年的公司</div>
+      <div class="menu-btns">
+        <div class="btn primary" id="btn-start">开始变革</div>
+        <div class="btn" id="btn-help">玩法指南</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 角色选择 -->
+  <div class="screen" id="screen-select">
+    <div class="sel-title">选择你的变革领袖<small>四种 AI 原生人才原型 —— 每一种，都是一种组织哲学</small></div>
+    <div class="char-row" id="char-row"></div>
+    <div class="sel-confirm">
+      <div class="btn" id="btn-sel-back">返回</div>
+      <div class="btn gold" id="btn-sel-go">接过董事会授权书</div>
+    </div>
+  </div>
+
+  <!-- 剧情 -->
+  <div class="screen" id="screen-story">
+    <div class="story-bg" id="story-bg"></div>
+    <div class="story-inner" id="story-box">
+      <div class="story-text" id="story-text"></div>
+      <div class="story-skip" style="color:var(--txt2);font-size:12px;letter-spacing:2px">点击任意处跳过</div>
+    </div>
+    <div class="dialogue-box" id="dialogue-box" style="display:none">
+      <div class="dialogue-who" id="dialogue-who"></div>
+      <div class="dialogue-text" id="dialogue-text"></div>
+      <div class="dialogue-next" style="color:var(--txt2);font-size:12px">点击继续 ▸</div>
+    </div>
+  </div>
+
+  <!-- 地图 -->
+  <div class="screen" id="screen-map">
+    <div class="map-top">
+      <div class="map-title"><span id="map-title">第一幕</span><small id="map-sub">选择你的路线</small></div>
+      <div class="map-hud">
+        <div class="relic-bar" id="relic-bar"></div>
+        <div class="hud-chip hp">💚 <span id="hud-hp">80/80</span></div>
+        <div class="hud-chip">💰 <b id="hud-budget">99</b></div>
+      </div>
+    </div>
+    <div id="map-svg-wrap"><div id="map-svg"></div></div>
+  </div>
+
+  <!-- 战斗 -->
+  <div class="screen" id="screen-battle">
+    <div class="battle-bg" id="battle-bg"></div>
+    <div class="battle-top">
+      <div class="combat-log" id="combat-log"></div>
+    </div>
+    <div class="enemy-zone" id="enemy-zone"></div>
+    <div class="player-zone">
+      <div class="player-bar">
+        <div class="player-info">
+          <img class="char-avatar" id="char-avatar" src="assets/char_suchen.png" alt="主角">
+          <div class="pstats">
+            <div class="pstat-row">
+              <div class="hp-orb"><i class="fill" id="hp-fill"></i><span id="hud-hp-val">80/80</span><small>组织健康度</small></div>
+              <div class="energy-orb"><span id="energy-val">3</span><small id="energy-max">/ 3</small></div>
+              <div class="block-badge" id="block-wrap" style="display:none">🛡️ <b id="block-val">0</b></div>
+            </div>
+            <div class="status-row" id="player-status" style="max-width:420px"></div>
+            <div class="potion-bar" id="potion-bar"></div>
+          </div>
+        </div>
+        <div class="player-info">
+          <div class="pile-btn" id="pile-draw"><b id="pile-draw-n">0</b>抽牌堆</div>
+          <div class="pile-btn" id="pile-discard"><b id="pile-discard-n">0</b>弃牌堆</div>
+          <div class="pile-btn" id="pile-exhaust"><b id="pile-exhaust-n">0</b>消耗堆</div>
+          <div class="end-turn" id="btn-end-turn">结束回合</div>
+        </div>
+      </div>
+      <div class="hand-zone"><div class="hand-cards" id="hand-cards"></div></div>
+    </div>
+  </div>
+
+  <!-- 结局 -->
+  <div class="screen" id="screen-ending">
+    <div class="ending-bg" id="ending-bg"></div>
+    <div class="end-title" id="ending-title">重构完成</div>
+    <div class="end-text" id="ending-text"></div>
+    <div class="end-stats" id="ending-stats"></div>
+    <div class="overlay-actions" style="position:relative;z-index:2">
+      <div class="btn" id="btn-ending-menu">回到主菜单</div>
+      <div class="btn gold" id="btn-ending-new">再开一局</div>
+    </div>
+  </div>
+
+  <!-- 死亡 -->
+  <div class="screen" id="screen-death">
+    <div class="ending-bg" style="background-image:url(assets/boss_entropy.png);opacity:.25"></div>
+    <div class="end-title lose" id="death-title">组织熵增报告</div>
+    <div class="end-text" id="death-text"></div>
+    <div class="end-stats" id="death-stats"></div>
+    <div class="overlay-actions" style="position:relative;z-index:2">
+      <div class="btn" id="btn-restart">换一位领袖重来</div>
+      <div class="btn primary" id="btn-retry">同一领袖再战</div>
+    </div>
+  </div>
+
+  <!-- 弹层们 -->
+  <div class="overlay" id="ov-generic"></div>
+  <div class="overlay" id="ov-cards"></div>
+  <div class="overlay" id="ov-reward"></div>
+  <div class="overlay" id="ov-event"></div>
+  <div class="overlay" id="ov-shop"></div>
+
+  <div class="target-hint" id="target-hint">🎯 选择一个目标（点击上方敌人 · 再点手牌取消）</div>
+  <div id="toast"></div>
+  <div id="mute-btn">🔊</div>
+  <div id="deck-btn" style="display:none">🃏 卡组</div>
+</div>
+
+<script>
+window.addEventListener('error', function (e) {
+  var d = document.createElement('div');
+  d.id = 'js-error-dump';
+  d.style.cssText = 'position:fixed;top:0;left:0;z-index:9999;background:red;color:#fff;padding:6px;font-size:12px;max-width:100%;';
+  d.textContent = 'JS ERROR: ' + e.message + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno;
+  document.body.appendChild(d);
+});
+</script>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/map.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui.js"></script>
+<script>if (new URLSearchParams(location.search).get('test')) document.write('<script src="tests/e2e.js"><\/script>');</script>
+</body>
+</html>
