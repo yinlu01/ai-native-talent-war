@@ -143,31 +143,83 @@ body {
 }
 .relic-dot:hover .relic-tip { display: block; }
 .relic-tip b { color: var(--amber); display: block; margin-bottom: 4px; }
-#map-svg-wrap { flex: 1; position: relative; min-height: 0; }
+#map-svg-wrap { flex: 1; position: relative; min-height: 0; cursor: default; }
 #map-svg { width: 100%; height: 100%; }
 
 /* 地图节点样式 */
-.map-node { cursor: pointer; transition: transform .2s; }
-.map-node:hover { transform: scale(1.08); }
+.map-node { cursor: pointer; }
 .map-node.locked { opacity: 0.4; cursor: not-allowed; }
-.map-node.past { opacity: 0.5; }
-.map-node.past:hover { transform: none; }
+.map-node.past { opacity: 0.55; }
+.map-node.past:hover { transform: none !important; }
 .map-node.current { cursor: default; }
-.map-node.current:hover { transform: none; }
+.map-node.current:hover { transform: none !important; }
 
-/* BOSS 节点特殊样式 */
-.map-node.boss-node circle.node-bg {
-  stroke-width: 3;
-  filter: drop-shadow(0 0 15px rgba(239, 106, 90, .6));
+/* 节点环动画 */
+.map-node.avail .node-ring {
+  animation: ringPulse 2s ease-in-out infinite;
+}
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
 }
 
-.map-node-label { fill: var(--txt2); font-size: 11px; pointer-events: none; letter-spacing: .5px; font-family: inherit; }
-.map-node text { fill: var(--txt); pointer-events: none; }
+/* 节点悬停效果 */
+.map-node.avail:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.map-node.avail:hover .node-icon {
+  color: #fff !important;
+}
+
+/* BOSS 节点特殊样式 */
+.map-node.boss-node .node-bg {
+  stroke: #ef6a5a;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 12px rgba(239, 106, 90, .7));
+}
+.map-node.boss-node .node-ring {
+  animation: bossRing 1.5s ease-in-out infinite;
+}
+@keyframes bossRing {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.1); }
+}
+
+.map-node-label { fill: #8fa3c4; font-size: 11px; pointer-events: none; letter-spacing: .5px; font-family: inherit; }
+.map-node .node-icon { pointer-events: none; }
 
 /* ---------- 战斗 ---------- */
-#screen-battle { flex-direction: column; background: #05080f; }
-.battle-bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: .34; }
-.battle-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5,8,15,.35), rgba(5,8,15,.88) 78%); }
+#screen-battle {
+  flex-direction: column;
+  background: linear-gradient(135deg, #0a0f1a 0%, #0d1525 50%, #0a1020 100%);
+  position: relative;
+}
+/* 公司战场景氛围 */
+#screen-battle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(239, 106, 90, 0.08), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 80% 20%, rgba(56, 189, 248, 0.06), transparent 60%),
+    linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%);
+  pointer-events: none;
+}
+.battle-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: .25;
+  filter: saturate(0.8);
+}
+.battle-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5,8,15,.4) 0%, rgba(5,8,15,.85) 70%);
+}
 .battle-top { position: relative; z-index: 2; display: flex; justify-content: space-between; padding: 10px 18px; align-items: flex-start; }
 .combat-log {
   width: 320px; max-height: 26vh; overflow: hidden; font-size: 11.5px; line-height: 1.7;
@@ -194,7 +246,7 @@ body {
 }
 .enemy.targetable .enemy-img { cursor: pointer; }
 .enemy.targetable .enemy-img:hover { border-color: var(--red); box-shadow: 0 0 0 3px rgba(239, 106, 90, .35), 0 10px 30px rgba(0,0,0,.55); }
-.enemy.boss .enemy-img { width: 210px; height: 210px; border-color: var(--gold); }
+.enemy.boss .enemy-img { width: 210px; height: 210px; border-color: var(--gold); box-shadow: 0 0 20px rgba(212, 169, 78, .3), 0 10px 30px rgba(0,0,0,.55); }
 .enemy .dmg-pop {
   position: absolute; top: 30%; left: 50%; font-size: 30px; font-weight: 800; color: #ff9f43;
   text-shadow: 0 2px 8px #000; pointer-events: none; z-index: 10;
@@ -209,9 +261,10 @@ body {
 .enemy-hpbar span { position: absolute; inset: 0; font-size: 9.5px; color: #fff; text-align: center; line-height: 13px; text-shadow: 0 1px 2px #000; }
 .enemy-block { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); background: rgba(56, 100, 190, .9); border: 1px solid #9dc0ff; color: #fff; font-size: 11px; border-radius: 10px; padding: 1px 8px; }
 .intent {
-  min-height: 40px; display: flex; align-items: center; gap: 6px; background: rgba(5, 8, 15, .8);
+  min-height: 40px; display: flex; align-items: center; gap: 6px; background: rgba(5, 8, 15, .85);
   border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 11.5px; max-width: 180px;
   text-align: center; line-height: 1.4;
+  backdrop-filter: blur(4px);
 }
 .intent .ic { font-size: 16px; }
 .intent.attack { border-color: rgba(239, 106, 90, .6); color: #ffb3a9; }

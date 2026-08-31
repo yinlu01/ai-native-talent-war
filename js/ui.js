@@ -293,14 +293,25 @@
   }
 
   /* ---------------- 幕 / 地图 ---------------- */
+  /* SVG图标（更精致的视觉效果） */
+  const NODE_ICONS = {
+    entrance: `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>`,
+    fight: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 7l4 4M7 17l-4 4"/></svg>`,
+    elite: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/></svg>`,
+    shop: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>`,
+    rest: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/></svg>`,
+    event: `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>`,
+    boss: `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zM12 8v4M12 16h.01"/></svg>`
+  };
+
   const NODE_META = {
-    entrance: { icon: '🚪', label: '入口', color: '#38bdf8' },
-    fight: { icon: '⚔️', label: '部门挑战', color: '#ef6a5a' },
-    elite: { icon: '👑', label: '关键战役', color: '#d4a94e' },
-    shop: { icon: '🛒', label: '猎头市场', color: '#4ade80' },
-    rest: { icon: '☕', label: '复盘会', color: '#f5b453' },
-    event: { icon: '❓', label: '管理事件', color: '#a78bfa' },
-    boss: { icon: '☠️', label: 'BOSS战', color: '#ef6a5a' }
+    entrance: { icon: 'entrance', label: '入口', color: '#38bdf8' },
+    fight: { icon: 'fight', label: '部门挑战', color: '#ef6a5a' },
+    elite: { icon: 'elite', label: '关键战役', color: '#d4a94e' },
+    shop: { icon: 'shop', label: '猎头市场', color: '#4ade80' },
+    rest: { icon: 'rest', label: '复盘会', color: '#f5b453' },
+    event: { icon: 'event', label: '管理事件', color: '#a78bfa' },
+    boss: { icon: 'boss', label: 'BOSS战', color: '#ef6a5a' }
   };
 
   /* 每幕主题色（用于地图背景/节点辉光） */
@@ -425,16 +436,15 @@
         const strokeW = isCur ? 3 : isBoss ? 2.5 : 1.5;
 
         nodes += `<g class="map-node ${stateClass}${isBoss ? ' boss-node' : ''}" data-key="${key}" data-type="${node.type}" transform="translate(${p.x},${p.y})">
-          ${isAvail && !isCur ? `<circle r="${R + 10}" fill="none" stroke="${meta.color}" stroke-width="2" opacity="0.5">
-            <animate attributeName="r" values="${R+6};${R+12};${R+6}" dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite"/>
-          </circle>` : ''}
+          <circle class="node-ring" r="${R + 8}" fill="none" stroke="${meta.color}" stroke-width="2" opacity="${isAvail && !isCur ? 0.6 : 0.2}"/>
           <circle class="node-bg" r="${R}" fill="${fillColor}" fill-opacity="${fillOpacity}"
             stroke="${isCur ? meta.color : '#2a3a52'}" stroke-width="${strokeW}"
-            ${isCur ? `filter="drop-shadow(0 0 12px ${meta.color})"` : ''}/>
-          <text text-anchor="middle" dominant-baseline="central" font-size="${isBoss ? 28 : 22}">${meta.icon}</text>
-          <text class="map-node-label" y="${R + 16}" text-anchor="middle" font-size="11" fill="${isPast ? '#4a5568' : '#8fa3c4'}">${meta.label}</text>
-          ${isCur ? `<text y="${-R - 8}" text-anchor="middle" font-size="10" fill="${meta.color}">当前位置</text>` : ''}
+            ${isCur ? `filter="url(#glow)"` : ''}/>
+          <g class="node-icon" transform="translate(-13,-13)" style="color:${isCur ? meta.color : isPast ? '#4a5568' : '#8fa3c4'}">
+            ${NODE_ICONS[node.type] || NODE_ICONS.fight}
+          </g>
+          <text class="map-node-label" y="${R + 18}" text-anchor="middle" font-size="11" fill="${isPast ? '#4a5568' : '#8fa3c4'}">${meta.label}</text>
+          ${isCur ? `<text y="${-R - 6}" text-anchor="middle" font-size="10" fill="${meta.color}" font-weight="bold">当前</text>` : ''}
         </g>`;
       });
     }
@@ -456,17 +466,24 @@
       ${progressBar}
     </svg>`;
 
-    // 绑定点击事件
-    $$('.map-node.avail, .map-node.current').forEach(el => {
-      el.style.cursor = 'pointer';
-      el.addEventListener('click', () => {
-        const key = el.dataset.key;
-        if (!avail.has(key) && !el.classList.contains('current')) return;
-        const [r, c] = key.split(',').map(Number);
-        SFX.play('click');
-        enterNode(r, c);
-      });
-    });
+    // 事件委托：绑定到SVG容器上，避免动态元素问题
+    svgWrap.onclick = function(e) {
+      var el = e.target.closest('.map-node');
+      if (!el) return;
+      var key = el.dataset.key;
+      if (!key) return;
+      var isAvail = el.classList.contains('avail');
+      var isCurrent = el.classList.contains('current');
+      if (!isAvail && !isCurrent) return;
+      var type = el.dataset.type;
+      // 入口节点只能查看不能进入
+      if (type === 'entrance' && !isCurrent) return;
+      var parts = key.split(',');
+      var r = parseInt(parts[0]);
+      var c = parseInt(parts[1]);
+      SFX.play('click');
+      enterNode(r, c);
+    };
   }
 
   function enterNode(r, c) {
