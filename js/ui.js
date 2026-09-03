@@ -383,8 +383,10 @@
     // 计算可用节点集合
     let avail = new Set();
     if (!G.pos) {
-      // 起点：入口行的中间节点
-      m[0].forEach((node, c) => { if (node) avail.add('0,' + c); });
+      // 起点：从第1行（不是入口行）开始选
+      m[1] && m[1].forEach((node, c) => {
+        if (node) avail.add('1,' + c);
+      });
     } else {
       // 根据当前位置找下一层可选节点
       const currentNode = m[G.pos.row][G.pos.col];
@@ -475,9 +477,6 @@
       var isAvail = el.classList.contains('avail');
       var isCurrent = el.classList.contains('current');
       if (!isAvail && !isCurrent) return;
-      var type = el.dataset.type;
-      // 入口节点只能查看不能进入
-      if (type === 'entrance' && !isCurrent) return;
       var parts = key.split(',');
       var r = parseInt(parts[0]);
       var c = parseInt(parts[1]);
@@ -499,7 +498,6 @@
         case 'shop': openShop(); break;
         case 'rest': openRest(); break;
         case 'event': openEvent(); break;
-        case 'entrance': renderMap(); break; // 入口节点直接刷新
       }
     });
   }
