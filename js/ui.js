@@ -32,11 +32,13 @@
     _overlayLock: false, // overlay 操作锁
   };
 
-  /* 全局操作锁：防止快速点击在状态更新前重复触发 */
+  /* 全局操作锁：防止快速点击在状态更新前重复触发；计数器支持嵌套 */
   function withLock(fn) {
-    if (G._actionLock) return;
-    G._actionLock = true;
-    try { fn(); } finally { G._actionLock = false; }
+    G._actionLock = (G._actionLock || 0) + 1;
+    try { fn(); } finally {
+      G._actionLock--;
+      if (G._actionLock < 0) G._actionLock = 0;
+    }
   }
 
   /* ---------------- 工具 ---------------- */
@@ -555,7 +557,6 @@
   }
 
   function beginBattle(ids, kind) {
-    if (G._actionLock) return;
     withLock(() => {
       const ch = D.chars[G.charId];
       G._battleResolved = false;
